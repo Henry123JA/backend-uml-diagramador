@@ -1,35 +1,29 @@
 package com.example.demo.service;
 
-import com.example.demo.model.producto;
-import com.example.demo.repository.productoRepository;
+import com.example.demo.model.Producto;
+import com.example.demo.repository.ProductoRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
-public class productoService {
+public class ProductoService {
+    private final ProductoRepository repository;
 
-    private final productoRepository repository;
-
-    public productoService(productoRepository repository) {
+    public ProductoService(ProductoRepository repository) {
         this.repository = repository;
     }
 
-    public List<producto> findAll() {
+    public List<Producto> findAll() {
         return repository.findAll();
     }
 
-    public Optional<producto> findById(Long id) {
+    public Optional<Producto> findById(Long id) {
         return repository.findById(id);
     }
 
-    public producto save(producto entity) {
-        return repository.save(entity);
-    }
-
-    public producto update(Long id, producto entity) {
-        entity.setId(id);
+    public Producto save(Producto entity) {
         return repository.save(entity);
     }
 

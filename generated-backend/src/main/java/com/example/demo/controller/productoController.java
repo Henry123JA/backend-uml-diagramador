@@ -1,43 +1,54 @@
 package com.example.demo.controller;
 
-import com.example.demo.model.producto;
-import com.example.demo.service.productoService;
+import com.example.demo.model.Producto;
+import com.example.demo.service.ProductoService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/productos")
-public class productoController {
+@RequestMapping("/api/producto")
+public class ProductoController {
+    private final ProductoService service;
 
-    private final productoService service;
-
-    public productoController(productoService service) {
+    public ProductoController(ProductoService service) {
         this.service = service;
     }
 
     @GetMapping
-    public List<producto> findAll() {
+    public List<Producto> getAll() {
         return service.findAll();
     }
 
     @GetMapping("/{id}")
-    public producto findById(@PathVariable Long id) {
-        return service.findById(id).orElse(null);
+    public ResponseEntity<Producto> getById(@PathVariable Long id) {
+        return service.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public producto save(@RequestBody producto entity) {
+    public Producto create(@RequestBody Producto entity) {
         return service.save(entity);
     }
 
     @PutMapping("/{id}")
-    public producto update(@PathVariable Long id, @RequestBody producto entity) {
-        return service.update(id, entity);
+    public ResponseEntity<Producto> update(@PathVariable Long id, @RequestBody Producto entity) {
+        return service.findById(id)
+                .map(existing -> {
+                    entity.setId(id);
+                    return ResponseEntity.ok(service.save(entity));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (service.findById(id).isPresent()) {
+            service.delete(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }

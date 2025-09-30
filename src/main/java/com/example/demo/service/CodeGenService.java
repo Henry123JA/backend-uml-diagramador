@@ -1,16 +1,12 @@
 package com.example.demo.service;
 
-import com.example.demo.model.UmlClass;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import freemarker.template.*;
-
 import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
-import java.util.zip.ZipOutputStream;
-import java.util.zip.ZipEntry;
+import java.util.zip.*;
 
 @Service
 public class CodeGenService {
@@ -24,19 +20,24 @@ public class CodeGenService {
         cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
     }
 
-    public File generateFromJson(String umlJson) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        UmlClass[] classes = mapper.readValue(umlJson, UmlClass[].class);
-
-        // Ajustar paquete según tu proyecto
-        String basePackage = "com.example.demo";
-
+    public File saveCodeAsZip(String entitiesCode, String basePackage) throws Exception {
+        // 📂 Carpeta base generada
         Path baseDir = Paths.get("generated-backend/src/main/java/" + basePackage.replace(".", "/"));
-        Path modelDir = baseDir.resolve("model");
+        Path resourcesDir = Paths.get("generated-backend/src/main/resources");
         Path repoDir = baseDir.resolve("repository");
         Path serviceDir = baseDir.resolve("service");
         Path controllerDir = baseDir.resolve("controller");
-        Path resourcesDir = Paths.get("generated-backend/src/main/resources");
+        Path modelDir = baseDir.resolve("model");
+
+
+        // 🔄 Borrar si ya existía
+        Path genDir = Paths.get("generated-backend");
+        if (Files.exists(genDir)) {
+            Files.walk(genDir)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+        }
 
         Files.createDirectories(modelDir);
         Files.createDirectories(repoDir);
@@ -44,48 +45,43 @@ public class CodeGenService {
         Files.createDirectories(controllerDir);
         Files.createDirectories(resourcesDir);
 
-        for (UmlClass c : classes) {
-            Map<String, Object> data = new HashMap<>();
-            data.put("className", c.getName());
-            data.put("attributes", c.getAttributes());
-            data.put("basePackage", basePackage);
+        // 1️⃣ Guardar Entities directamente del código de OpenAI
+        saveEntities(entitiesCode, modelDir);
 
-            // Entity
-            renderTemplate("Entity.ftl", data, modelDir.resolve(c.getName() + ".java"));
-
-            // Repository
-            renderTemplate("Repository.ftl", data, repoDir.resolve(c.getName() + "Repository.java"));
-
-            // Service
-            renderTemplate("Service.ftl", data, serviceDir.resolve(c.getName() + "Service.java"));
-
-            // Controller
-            renderTemplate("Controller.ftl", data, controllerDir.resolve(c.getName() + "Controller.java"));
-        }
-
-        // application.properties (una sola vez)
-        Map<String, Object> dbConfig = new HashMap<>();
-        dbConfig.put("dbName", "mydb");
-        dbConfig.put("dbUser", "postgres");
-        dbConfig.put("dbPassword", "8960406");
-
-        renderTemplate(
-                "application.properties.ftl",
-                dbConfig,
+        // 2️⃣ Generar demás archivos desde templates .ftl
+        renderTemplate("application.properties.ftl",
+                Map.of("dbName", "mydb", "dbUser", "postgres", "dbPassword", "8960406"),
                 resourcesDir.resolve("application.properties"));
 
-        renderTemplate(
-                "GeneratedBackendApplication.ftl",
+        renderTemplate("GeneratedBackendApplication.ftl",
                 Map.of("basePackage", basePackage),
-                baseDir.resolve("GeneratedBackendApplication.java")
-        );
-        // pom.xml
-        Map<String, Object> pomData = new HashMap<>();
-        pomData.put("basePackage", basePackage);
-        pomData.put("artifactId", "generated-backend");
-        renderTemplate("pom.ftl", pomData, Paths.get("generated-backend/pom.xml"));
+                baseDir.resolve("GeneratedBackendApplication.java"));
 
-        // Comprimir en ZIP
+        renderTemplate("pom.ftl",
+                Map.of("basePackage", basePackage, "artifactId", "generated-backend"),
+                Paths.get("generated-backend/pom.xml"));
+
+        // 🔄 Recorrer entidades y generar repos, services, controllers
+        // ⚠️ Aquí puedes parsear los nombres de las clases de "entitiesCode"
+        List<String> classNames = extractClassNames(entitiesCode);
+
+        renderTemplate("readme.md.ftl",
+                Map.of("classNames", classNames),
+                Paths.get("generated-backend/README.md"));
+
+        // 🔄 Recorrer entidades y generar repos, services, controllers
+        for (String className : classNames) {
+            Map<String, Object> data = Map.of(
+                    "basePackage", basePackage,
+                    "className", className
+            );
+
+            renderTemplate("Repository.ftl", data, repoDir.resolve(className + "Repository.java"));
+            renderTemplate("Service.ftl", data, serviceDir.resolve(className + "Service.java"));
+            renderTemplate("Controller.ftl", data, controllerDir.resolve(className + "Controller.java"));
+        }
+
+        // 3️⃣ Empaquetar en ZIP
         File zipFile = new File("backend.zip");
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
             Files.walk(Paths.get("generated-backend"))
@@ -100,8 +96,39 @@ public class CodeGenService {
                         }
                     });
         }
-
         return zipFile;
+    }
+
+    private void saveEntities(String entitiesCode, Path modelDir) throws IOException {
+        // ⚠️ Este método separa cada bloque ```java ... ``` en un archivo .java
+        String[] blocks = entitiesCode.split("```java");
+        for (String block : blocks) {
+            if (!block.contains("class")) continue;
+            String code = block.replace("```", "").trim();
+
+            // Extraer nombre de clase
+            String className = extractClassName(code);
+            Files.writeString(modelDir.resolve(className + ".java"), code);
+        }
+    }
+
+    private String extractClassName(String code) {
+        for (String line : code.split("\n")) {
+            if (line.contains("class ")) {
+                return line.split("class ")[1].split(" ")[0].trim();
+            }
+        }
+        return "UnknownEntity";
+    }
+
+    private List<String> extractClassNames(String entitiesCode) {
+        List<String> names = new ArrayList<>();
+        for (String block : entitiesCode.split("```java")) {
+            if (block.contains("class ")) {
+                names.add(extractClassName(block));
+            }
+        }
+        return names;
     }
 
     private void renderTemplate(String templateName, Map<String, Object> data, Path outputPath) throws IOException {
@@ -115,17 +142,11 @@ public class CodeGenService {
         }
     }
 
-    public File generateSQLFromJson(String umlJson) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        UmlClass[] classes = mapper.readValue(umlJson, UmlClass[].class);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("classes", Arrays.asList(classes));
-
-        Path outputPath = Paths.get("schema.sql");
-        renderTemplate("schema.ftl", data, outputPath);
-
-        return outputPath.toFile();
+    public File saveTextAsFile(String content, String fileName) throws Exception {
+        File file = new File(System.getProperty("java.io.tmpdir"), fileName);
+        try (FileWriter writer = new FileWriter(file)) {
+            writer.write(content);
+        }
+        return file;
     }
-
 }

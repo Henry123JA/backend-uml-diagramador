@@ -2,14 +2,14 @@ package ${basePackage}.controller;
 
 import ${basePackage}.model.${className};
 import ${basePackage}.service.${className}Service;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/${className?lower_case}s")
+@RequestMapping("/api/${className?lower_case}")
 public class ${className}Controller {
-
     private final ${className}Service service;
 
     public ${className}Controller(${className}Service service) {
@@ -17,27 +17,38 @@ public class ${className}Controller {
     }
 
     @GetMapping
-    public List<${className}> findAll() {
+    public List<${className}> getAll() {
         return service.findAll();
     }
 
     @GetMapping("/{id}")
-    public ${className} findById(@PathVariable Long id) {
-        return service.findById(id).orElse(null);
+    public ResponseEntity<${className}> getById(@PathVariable Long id) {
+        return service.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ${className} save(@RequestBody ${className} entity) {
+    public ${className} create(@RequestBody ${className} entity) {
         return service.save(entity);
     }
 
     @PutMapping("/{id}")
-    public ${className} update(@PathVariable Long id, @RequestBody ${className} entity) {
-        return service.update(id, entity);
+    public ResponseEntity<${className}> update(@PathVariable Long id, @RequestBody ${className} entity) {
+        return service.findById(id)
+                .map(existing -> {
+                    entity.setId(id);
+                    return ResponseEntity.ok(service.save(entity));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (service.findById(id).isPresent()) {
+            service.delete(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }

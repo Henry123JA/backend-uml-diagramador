@@ -17,12 +17,11 @@ public class GeneratorController {
     public GeneratorController(CodeGenService codeGenService) {
         this.codeGenService = codeGenService;
     }
-
+/*
     @PostMapping("/backend")
-    public ResponseEntity<Resource> generate(@RequestBody String umlJson) throws IOException {
-        File zipFile = codeGenService.generateFromJson(umlJson);
+    public ResponseEntity<Resource> generateJson(@RequestBody String payload) throws IOException {
+        File zipFile = codeGenService.generateFromPayload(payload); // <-- NUEVO
         InputStreamResource resource = new InputStreamResource(new FileInputStream(zipFile));
-
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"backend.zip\"")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -30,14 +29,12 @@ public class GeneratorController {
     }
 
     @PostMapping("/sql")
-    public ResponseEntity<Resource> generateSQL(@RequestBody String umlJson) throws IOException {
-        File sqlFile = codeGenService.generateSQLFromJson(umlJson);
+    public ResponseEntity<Resource> generateSQL(@RequestBody String payload) throws IOException {
+        File sqlFile = codeGenService.generateSQLFromPayload(payload); // <-- NUEVO
         InputStreamResource resource = new InputStreamResource(new FileInputStream(sqlFile));
-
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"schema.sql\"")
                 .contentType(MediaType.TEXT_PLAIN)
                 .body(resource);
-    }
+    }*/
 }
-

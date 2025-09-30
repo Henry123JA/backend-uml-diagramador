@@ -9,7 +9,6 @@ import java.util.Optional;
 
 @Service
 public class ${className}Service {
-
     private final ${className}Repository repository;
 
     public ${className}Service(${className}Repository repository) {
@@ -25,11 +24,6 @@ public class ${className}Service {
     }
 
     public ${className} save(${className} entity) {
-        return repository.save(entity);
-    }
-
-    public ${className} update(Long id, ${className} entity) {
-        entity.setId(id);
         return repository.save(entity);
     }
 

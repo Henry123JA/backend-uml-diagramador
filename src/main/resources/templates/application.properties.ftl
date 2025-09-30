@@ -1,5 +1,5 @@
 # Puerto del servidor
-server.port=8080
+server.port=8081
 
 # Configuración PostgreSQL
 spring.datasource.url=jdbc:postgresql://localhost:5432/${dbName}
